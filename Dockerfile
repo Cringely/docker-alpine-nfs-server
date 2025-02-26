@@ -55,6 +55,9 @@ ENV VERSION_SHORT=$VERSION_SHORT
 ARG VERSION_GIT_HASH=""
 ENV VERSION_GIT_HASH=$VERSION_GIT_HASH
 ARG TARGETARCH
+ENV FSTYPE nfs4
+ENV MOUNT_OPTIONS nfsvers=4
+ENV MOUNTPOINT /mnt/nfs-1
 
 RUN GOARCH=$TARGETARCH go install -ldflags="\
       -X tailscale.com/version.longStamp=$VERSION_LONG \
@@ -63,17 +66,12 @@ RUN GOARCH=$TARGETARCH go install -ldflags="\
       -v ./cmd/tailscale ./cmd/tailscaled ./cmd/containerboot
 
 FROM alpine:3.18
-RUN apk add --no-cache ca-certificates iptables iproute2 ip6tables nfs-utils bash && \
-mkdir -p /var/lib/nfs/rpc_pipefs /var/lib/nfs/v4recovery && \
-echo "rpc_pipefs    /var/lib/nfs/rpc_pipefs rpc_pipefs      defaults        0       0" >> /etc/fstab && \
-echo "nfsd  /proc/fs/nfsd   nfsd    defaults        0       0" >> /etc/fstab
+RUN apk upgrade --no-cache && apk add --no-cache ca-certificates iptables iproute2 ip6tables nfs-utils bash && \
+    rm /sbin/halt /sbin/poweroff /sbin/reboot
 
-COPY exports /etc/
-COPY nfsd.sh /usr/bin/nfsd.sh
+ADD entry.sh /usr/local/bin/entry.sh
 
-RUN chmod +x /usr/bin/nfsd.sh
-
-ENTRYPOINT ["/usr/bin/nfsd.sh"]
+ENTRYPOINT ["/usr/local/bin/entry.sh"]
 
 COPY --from=build-env /go/bin/* /usr/local/bin/
 # For compat with the previous run.sh, although ideally you should be
